@@ -94,6 +94,26 @@ class Protocol:
         self.index = 0
         self.buffer = bytearray(140)
 
+    def _checksum(self, data: bytes):
+        sum = 0
+        for b in data:
+            sum += b
+        return sum & 0xFF
+
+    def build_configcmd(self, noise_filter, sensitivity, range) -> bytes:
+        command = bytearray(10)
+        command[0] = 0x53           # 'S'
+        command[1] = 0x46           # 'F'
+        command[2] = 1
+        command[3] = noise_filter   # 0..3
+        command[4] = sensitivity    # percent
+        command[5] = 0
+        command[6] = range          # 0=auto, 1=10ft, 2=20ft, 3=30ft, 4=60ft, 5=90ft, 6=120ft, 7=150ft, 8=200ft
+        command[7] = 0
+        command[8] = self._checksum(command[0:8])
+        command[9] = 0x55           # 'U'
+        return command
+
     def process(self, b) -> bytes | None:
         # store byte if it fits
         if self.index < len(self.buffer):
@@ -103,20 +123,17 @@ class Protocol:
         # check specific markers
         match self.index:
             case 0:
-                if b != 0x53:
+                if b != 0x53:  # 'S'
                     self.index = 0
                     return None
             case 1:
-                if b != 0x46:
+                if b != 0x46:  # 'F'
                     self.index = 0
                     return self.process(b)
             case 13:
                 # calculate checksum
-                actual = 0
-                for i in range(0, 13):
-                    actual += self.buffer[i]
-                actual &= 0xFF
-                if actual != b:
+                check = self._checksum(self.buffer[0:13])
+                if check != b:
                     self.index = 0
                     return self.process(b)
             case 14 | 136 | 138:
@@ -166,9 +183,12 @@ class SensorData:
             rawdata=data[15:135]
         )
 
+    def _to_meter(self, depth):
+        return depth * 0.3048 / 10.0;
+
     # depth in meters
     def get_depth(self) -> float:
-        return self.bottom * 0.3048 / 10.0
+        return self._to_meter(self.bottom)
 
     # battery in percentage
     def get_battery(self) -> float:
@@ -177,6 +197,10 @@ class SensorData:
     # temperature in degrees Celcius
     def get_temperature(self) -> float:
         return (self.temperature / 10.0 - 32) * 5 / 9
+
+    # depth range in meters
+    def get_depth_range(self) -> float:
+        return self._to_meter(self.depthrange)
 
 
 def main():
