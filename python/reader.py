@@ -168,7 +168,7 @@ class SensorData:
 
     # depth in meters
     def get_depth(self) -> float:
-        return self.bottom * 0.3048
+        return self.bottom * 0.3048 / 10.0
 
     # battery in percentage
     def get_battery(self) -> float:
