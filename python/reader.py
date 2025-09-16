@@ -183,12 +183,12 @@ class SensorData:
             rawdata=data[15:135]
         )
 
-    def _to_meter(self, depth):
-        return depth * 0.3048 / 10.0;
+    def _ft_to_meter(self, depth):
+        return depth * 0.3048;
 
     # depth in meters
     def get_depth(self) -> float:
-        return self._to_meter(self.bottom)
+        return self._ft_to_meter(self.bottom / 10.0)
 
     # battery in percentage
     def get_battery(self) -> float:
@@ -200,7 +200,7 @@ class SensorData:
 
     # depth range in meters
     def get_depth_range(self) -> float:
-        return self._to_meter(self.depthrange)
+        return self._ft_to_meter(self.depthrange)
 
 
 def main():
@@ -213,9 +213,10 @@ def main():
                 frame = protocol.process(b)
                 if frame:
                     print(f"Frame: {frame.hex()}")
-                    sensordata = SensorData.from_bytes(frame)
-                    print(f"{sensordata}")
-                    print(f"temp={sensordata.get_temperature():.1f},batt={sensordata.get_battery():.1f}")
+                    sd = SensorData.from_bytes(frame)
+                    print(f"{sd}")
+                    print(f"temp={sd.get_temperature():.1f}degC,batt={sd.get_battery():.1f}%,depth={sd.get_depth()}m,"
+                          f"range={sd.get_depth_range()}m")
 
 
 if __name__ == "__main__":
