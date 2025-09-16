@@ -4,6 +4,7 @@ import asyncio
 import queue
 import threading
 from dataclasses import dataclass
+from enum import IntFlag
 
 from bleak import BleakClient, BleakError
 
@@ -171,9 +172,10 @@ class Protocol:
 
 @dataclass
 class SensorData:
-    STATUS_CHARGING = 0x80
-    STATUS_CHARGE_DONE = 0x40
-    STATUS_OUT_OF_WATER = 0x08
+    class Status(IntFlag):
+        CHARGING = 0x80
+        CHARGE_DONE = 0x40
+        OUT_OF_WATER = 0x08
 
     status: int
     bottom: int
@@ -203,11 +205,11 @@ class SensorData:
         )
 
     def _ft_to_meter(self, depth):
-        return depth * 0.3048;
+        return depth * 0.3048
 
     # status
-    def get_status(self) -> int:
-        return self.status
+    def get_status(self) -> set:
+        return set(self.Status(self.status))
 
     # depth in meters
     def get_depth(self) -> float:
@@ -238,8 +240,8 @@ def main():
                     print(f"Frame: {frame.hex()}")
                     sd = SensorData.from_bytes(frame)
                     print(f"{sd}")
-                    print(f"temp={sd.get_temperature():.1f}degC,batt={sd.get_battery():.1f}%,depth={sd.get_depth()}m,"
-                          f"range={sd.get_depth_range()}m")
+                    print(f"status={sd.get_status()},temp={sd.get_temperature():.1f}degC,batt={sd.get_battery():.1f}%,"
+                          f"depth={sd.get_depth()}m,range={sd.get_depth_range()}m")
 
 
 if __name__ == "__main__":
