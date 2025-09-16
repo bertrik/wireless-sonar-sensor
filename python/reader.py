@@ -90,6 +90,21 @@ class BleSerialPort:
 
 
 class Protocol:
+    NOISE_OFF = 0
+    NOISE_LOW = 1
+    NOISE_MEDIUM = 2
+    NOISE_HIGH = 3
+
+    RANGE_AUTO = 0
+    RANGE_10FT = 1
+    RANGE_20FT = 2
+    RANGE_30FT = 3
+    RANGE_60FT = 4
+    RANGE_90FT = 5
+    RANGE_120FT = 6
+    RANGE_150FT = 7
+    RANGE_200FT = 8
+
     def __init__(self):
         self.index = 0
         self.buffer = bytearray(140)
@@ -102,16 +117,16 @@ class Protocol:
 
     def build_configcmd(self, noise_filter, sensitivity, range) -> bytes:
         command = bytearray(10)
-        command[0] = 0x53           # 'S'
-        command[1] = 0x46           # 'F'
+        command[0] = 0x53  # 'S'
+        command[1] = 0x46  # 'F'
         command[2] = 1
-        command[3] = noise_filter   # 0..3
-        command[4] = sensitivity    # percent
+        command[3] = noise_filter  # 0..3
+        command[4] = sensitivity  # percent
         command[5] = 0
-        command[6] = range          # 0=auto, 1=10ft, 2=20ft, 3=30ft, 4=60ft, 5=90ft, 6=120ft, 7=150ft, 8=200ft
+        command[6] = range  # 0=auto, 1=10ft, 2=20ft, 3=30ft, 4=60ft, 5=90ft, 6=120ft, 7=150ft, 8=200ft
         command[7] = 0
         command[8] = self._checksum(command[0:8])
-        command[9] = 0x55           # 'U'
+        command[9] = 0x55  # 'U'
         return command
 
     def process(self, b) -> bytes | None:
@@ -156,6 +171,10 @@ class Protocol:
 
 @dataclass
 class SensorData:
+    STATUS_CHARGING = 0x80
+    STATUS_CHARGE_DONE = 0x40
+    STATUS_OUT_OF_WATER = 0x08
+
     status: int
     bottom: int
     fishdepth: int
@@ -185,6 +204,10 @@ class SensorData:
 
     def _ft_to_meter(self, depth):
         return depth * 0.3048;
+
+    # status
+    def get_status(self) -> int:
+        return self.status
 
     # depth in meters
     def get_depth(self) -> float:
