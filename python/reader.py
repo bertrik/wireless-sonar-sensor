@@ -246,7 +246,7 @@ def main():
                 sd = SensorData.from_bytes(frame)
                 print(f"{sd}")
                 print(f"status={sd.get_status()},temp={sd.get_temperature():.1f}degC,batt={sd.get_battery():.1f}%,"
-                      f"depth={sd.get_depth()}m,range={sd.get_depth_range()}m")
+                      f"depth={sd.get_depth():.2f}m,range={sd.get_depth_range():.1f}m")
 
 
 if __name__ == "__main__":
