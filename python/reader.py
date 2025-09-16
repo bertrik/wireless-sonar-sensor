@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 import argparse
 import asyncio
+import math
 import queue
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import IntFlag
 
 from bleak import BleakClient, BleakError
@@ -185,7 +186,7 @@ class SensorData:
     temperature: int
     frequency: int
     depthrange: int
-    rawdata: bytes
+    rawdata: bytes = field(repr=False)
 
     @classmethod
     def from_bytes(cls, data: bytes):
@@ -221,7 +222,7 @@ class SensorData:
 
     # temperature in degrees Celcius
     def get_temperature(self) -> float:
-        return (self.temperature / 10.0 - 32) * 5 / 9
+        return (self.temperature / 10.0 - 32) * 5 / 9 if self.temperature > 0 else math.nan
 
     # depth range in meters
     def get_depth_range(self) -> float:
