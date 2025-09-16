@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import argparse
 import asyncio
 import queue
 import threading
@@ -229,8 +229,13 @@ class SensorData:
 
 
 def main():
-    print("Opening BleSerialPort")
-    with BleSerialPort("D3:01:01:02:2F:C6") as port:
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("-d", "--device",
+                        help="The FishHelper bluetooth device address", default="D3:01:01:02:2F:C6")
+    args = parser.parse_args()
+
+    print(f"Opening BleSerialPort '{args.device}'")
+    with BleSerialPort(args.device) as port:
         protocol = Protocol()
         while True:
             data = port.read()
