@@ -55,12 +55,12 @@ class BleSerialPort:
 
     def _on_notify(self, _sender, data: bytearray):
         for b in data:
-            self.rx_queue.put(bytes([b]))
+            self.rx_queue.put(b)
 
     def write(self, data: bytes, timeout=None):
         return self._call(self.client.write_gatt_char(WRITE_UUID, data), timeout)
 
-    def read(self, timeout=None) -> bytes | None:
+    def read(self, timeout=None) -> int | None:
         try:
             return self.rx_queue.get(timeout=timeout)
         except queue.Empty:
@@ -239,15 +239,14 @@ def main():
     with BleSerialPort(args.device) as port:
         protocol = Protocol()
         while True:
-            data = port.read()
-            for b in data:
-                frame = protocol.process(b)
-                if frame:
-                    print(f"Frame: {frame.hex()}")
-                    sd = SensorData.from_bytes(frame)
-                    print(f"{sd}")
-                    print(f"status={sd.get_status()},temp={sd.get_temperature():.1f}degC,batt={sd.get_battery():.1f}%,"
-                          f"depth={sd.get_depth()}m,range={sd.get_depth_range()}m")
+            b = port.read()
+            frame = protocol.process(b)
+            if frame:
+                print(f"Frame: {frame.hex()}")
+                sd = SensorData.from_bytes(frame)
+                print(f"{sd}")
+                print(f"status={sd.get_status()},temp={sd.get_temperature():.1f}degC,batt={sd.get_battery():.1f}%,"
+                      f"depth={sd.get_depth()}m,range={sd.get_depth_range()}m")
 
 
 if __name__ == "__main__":
