@@ -33,14 +33,14 @@ class BleSerialPort:
         self._call(self._connect())  # wait until connected
 
     async def _connect(self):
-        print(f"Connecting...")
+        print("Connecting...")
         await self.client.connect()
         if not self.client.is_connected:
             raise BleakError("Connection failed")
         await self.client.start_notify(NOTIFY_UUID, self._on_notify)
         print(f"Connected to {self.address}")
 
-    def _on_disconnect(self, client):
+    def _on_disconnect(self, _client):
         if not self._closing:
             print("Disconnected, retrying...")
             asyncio.run_coroutine_threadsafe(self._reconnect(), self.loop)
@@ -111,13 +111,7 @@ class Protocol:
         self.index = 0
         self.buffer = bytearray(140)
 
-    def _checksum(self, data: bytes):
-        sum = 0
-        for b in data:
-            sum += b
-        return sum & 0xFF
-
-    def build_configcmd(self, noise_filter, sensitivity, range) -> bytes:
+    def build_configcmd(self, noise_filter, sensitivity, depth_range) -> bytes:
         command = bytearray(10)
         command[0] = 0x53  # 'S'
         command[1] = 0x46  # 'F'
@@ -125,9 +119,9 @@ class Protocol:
         command[3] = noise_filter  # 0..3
         command[4] = sensitivity  # percent
         command[5] = 0
-        command[6] = range  # 0=auto, 1=10ft, 2=20ft, 3=30ft, 4=60ft, 5=90ft, 6=120ft, 7=150ft, 8=200ft
+        command[6] = depth_range
         command[7] = 0
-        command[8] = self._checksum(command[0:8])
+        command[8] = sum(command[0:8]) & 0xFF
         command[9] = 0x55  # 'U'
         return command
 
@@ -149,7 +143,7 @@ class Protocol:
                     return self.process(b)
             case 13:
                 # calculate checksum
-                check = self._checksum(self.buffer[0:13])
+                check = sum(self.buffer[0:13]) & 0xFF
                 if check != b:
                     self.index = 0
                     return self.process(b)
@@ -173,11 +167,6 @@ class Protocol:
 
 @dataclass
 class SensorData:
-    class Status(IntFlag):
-        CHARGING = 0x80
-        CHARGE_DONE = 0x40
-        OUT_OF_WATER = 0x08
-
     status: int
     bottom: int
     fishdepth: int
@@ -187,6 +176,11 @@ class SensorData:
     frequency: int
     depthrange: int
     rawdata: bytes = field(repr=False)
+
+    class Status(IntFlag):
+        CHARGING = 0x80
+        CHARGE_DONE = 0x40
+        OUT_OF_WATER = 0x08
 
     @classmethod
     def from_bytes(cls, data: bytes):
@@ -245,7 +239,8 @@ def main():
                 print(f"Frame: {frame.hex()}")
                 sd = SensorData.from_bytes(frame)
                 print(f"{sd}")
-                print(f"status={sd.get_status()},temp={sd.get_temperature():.1f}degC,batt={sd.get_battery():.1f}%,"
+                print(f"status={sd.get_status()},temp={sd.get_temperature():.1f}degC,"
+                      f"batt={sd.get_battery():.1f}%,"
                       f"depth={sd.get_depth():.2f}m,range={sd.get_depth_range():.1f}m")
 
 
