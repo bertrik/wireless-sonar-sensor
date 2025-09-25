@@ -17,12 +17,12 @@ READ_UUID = "0000fff3-0000-1000-8000-00805f9b34fb"
 class BleSerialPort:
     def __init__(self, address, reconnect_delay=3):
         self.address = address
+        self.reconnect_delay = reconnect_delay
         self.loop = asyncio.new_event_loop()
-        self.client = BleakClient(address, disconnected_callback=self._on_disconnect)
-        self.rx_queue = queue.Queue()
-        self._thread = threading.Thread(target=self._run_loop, daemon=True)
-        self._reconnect_delay = reconnect_delay
+        self.client: BleakClient | None = None
+        self.rx_queue: queue.Queue[int] = queue.Queue()
         self._closing = False
+        self._thread = threading.Thread(target=self._run_loop, daemon=True)
 
     def _run_loop(self):
         asyncio.set_event_loop(self.loop)
@@ -30,34 +30,33 @@ class BleSerialPort:
 
     def open(self):
         self._thread.start()
-        self._call(self._connect())  # wait until connected
+        self._call(self._connect())  # block until connected
 
     async def _connect(self):
-        print("Connecting...")
-        await self.client.connect()
-        if not self.client.is_connected:
-            raise BleakError("Connection failed")
-        await self.client.start_notify(NOTIFY_UUID, self._on_notify)
-        print(f"Connected to {self.address}")
+        while not self._closing:
+            try:
+                print("Connecting...")
+                self.client = BleakClient(self.address, disconnected_callback=self._on_disconnect)
+                await self.client.connect()
+                await self.client.start_notify(NOTIFY_UUID, self._on_notify)
+                print(f"Connected to {self.address}")
+                return
+            except Exception as e:
+                print(f"Connection failed: {e}")
+                await asyncio.sleep(self.reconnect_delay)
 
     def _on_disconnect(self, _client):
         if not self._closing:
-            print("Disconnected, retrying...")
-            asyncio.run_coroutine_threadsafe(self._reconnect(), self.loop)
-
-    async def _reconnect(self):
-        while not self._closing:
-            try:
-                await self._connect()
-                return
-            except Exception:
-                await asyncio.sleep(self._reconnect_delay)
+            print("Disconnected, will retry...")
+            asyncio.run_coroutine_threadsafe(self._connect(), self.loop)
 
     def _on_notify(self, _sender, data: bytearray):
         for b in data:
             self.rx_queue.put(b)
 
     def write(self, data: bytes, timeout=None):
+        if not self.client or not self.client.is_connected:
+            raise BleakError("Not connected")
         return self._call(self.client.write_gatt_char(WRITE_UUID, data), timeout)
 
     def read(self, timeout=None) -> int | None:
@@ -74,9 +73,10 @@ class BleSerialPort:
         self.loop.close()
 
     async def _disconnect(self):
-        if self.client.is_connected:
+        if self.client and self.client.is_connected:
             await self.client.stop_notify(NOTIFY_UUID)
             await self.client.disconnect()
+        self.client = None
         print("Disconnected cleanly")
 
     def _call(self, coro, timeout=None):
@@ -87,7 +87,7 @@ class BleSerialPort:
         self.open()
         return self
 
-    def __exit__(self, *a):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
 
